@@ -3,36 +3,35 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>我的 QRCode｜慈濟大學微笑漣漪系統</title>
+  <meta name="theme-color" content="#fffdf7">
+  <title>我的微笑碼｜P04 微笑漣漪</title>
   <link rel="stylesheet" href="styles.css">
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="page-shell narrow-shell">
-    <main class="content-card centered-card compact-card">
-      <h1 class="page-title">我的 QRCode</h1>
-      <p class="description tight-text">請將此畫面出示給對方掃描。</p>
+    <main class="qr-card">
+      <div class="section-kicker">MY SMILE CODE</div>
+      <h1 class="page-title">我的微笑碼</h1>
+      <p class="scanner-help">把這個碼給對方掃描。對方掃一次，就能直接記錄你帶給他的善意。</p>
 
-      <div class="qr-profile-card">
-        <div id="myNicknameDisplay" class="qr-nickname-display"></div>
-        <div id="myAccountDisplay" class="qr-account-display"></div>
+      <div class="qr-profile">
+        <strong id="myNicknameDisplay"></strong>
+        <span id="myAccountDisplay"></span>
       </div>
 
-      <div id="myQrCodeBox" class="my-qr-box"></div>
+      <div id="myQrCodeBox" class="qr-box"></div>
+      <p id="smileCodeUrl" class="smile-code-url"></p>
       <p id="myQrMessage" class="status-message"></p>
 
-      <section id="liveNoticePanel" class="live-notice-panel hidden" aria-live="polite">
-        <div class="live-notice-title">剛剛收到的紀錄</div>
-        <div id="liveNoticeText" class="live-notice-text"></div>
+      <section id="liveNoticePanel" class="notice-card hidden" aria-live="polite">
+        <strong>💐 剛剛收到一筆新紀錄</strong>
+        <p id="liveNoticeText"></p>
       </section>
 
-      <div class="action-row">
-        <button id="editAccountBtn" class="btn btn-secondary">回主畫面</button>
-      </div>
+      <a class="back-link" href="./">← 回 P04 首頁</a>
     </main>
   </div>
-
   <script src="config.js"></script>
   <script src="myqrcode.js"></script>
 </body>

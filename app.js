@@ -1,352 +1,183 @@
 (function () {
-  const config = window.APP_CONFIG;
-  const welcomeText = document.getElementById('welcomeText');
-  const accountFormSection = document.getElementById('accountFormSection');
-  const currentAccountSection = document.getElementById('currentAccountSection');
-  const currentAccountText = document.getElementById('currentAccountText');
-  const currentNicknameText = document.getElementById('currentNicknameText');
-  const accountInput = document.getElementById('accountInput');
-  const nicknameInput = document.getElementById('nicknameInput');
-  const saveAccountBtn = document.getElementById('saveAccountBtn');
-  const editAccountBtn = document.getElementById('editAccountBtn');
-  const myQrBtn = document.getElementById('myQrBtn');
-  const scanBtn = document.getElementById('scanBtn');
-  const indexMessage = document.getElementById('indexMessage');
-  const systemEntryQr = document.getElementById('systemEntryQr');
-  const totalSmileCount = document.getElementById('totalSmileCount');
-  const smilerRankingList = document.getElementById('smilerRankingList');
-  const responderRankingList = document.getElementById('responderRankingList');
-  const mySmileRecordsBody = document.getElementById('mySmileRecordsBody');
-  const myResponseRecordsBody = document.getElementById('myResponseRecordsBody');
+  const config = window.APP_CONFIG || {};
+  const $ = id => document.getElementById(id);
+
+  const accountFormSection = $('accountFormSection');
+  const currentAccountSection = $('currentAccountSection');
+  const accountInput = $('accountInput');
+  const nicknameInput = $('nicknameInput');
+  const currentAccountText = $('currentAccountText');
+  const currentNicknameText = $('currentNicknameText');
+  const welcomeText = $('welcomeText');
+  const pendingTargetHint = $('pendingTargetHint');
+  const responseSection = $('responseSection');
+  const targetSection = $('targetSection');
+  const targetNameText = $('targetNameText');
+  const targetAccountText = $('targetAccountText');
+  const homeActions = $('homeActions');
+  const indexMessage = $('indexMessage');
+  const totalSmileCount = $('totalSmileCount');
+  const smilerRankingList = $('smilerRankingList');
+  const responderRankingList = $('responderRankingList');
+  const mySmileRecordsBody = $('mySmileRecordsBody');
+  const myResponseRecordsBody = $('myResponseRecordsBody');
 
   let mySmilePage = 1;
   let myResponsePage = 1;
 
-  function normalizeAccount(value) {
-    return (value || '').trim().toLowerCase();
+  const params = new URLSearchParams(location.search);
+  const targetAccount = normalizeAccount(params.get('to'));
+  const targetNickname = normalizeNickname(params.get('name'));
+
+  function normalizeAccount(v){ return String(v || '').trim().toLowerCase(); }
+  function normalizeNickname(v){ return String(v || '').trim(); }
+  function validAccount(v){ return /^[a-zA-Z0-9._%+-]+$/.test(normalizeAccount(v)); }
+  function validNickname(v){ const n=normalizeNickname(v); return n.length>0 && n.length <= (config.NICKNAME_MAX_LENGTH || 20); }
+  function accountToEmail(v){ return `${normalizeAccount(v)}${config.EMAIL_DOMAIN || '@gms.tcu.edu.tw'}`; }
+  function myAccount(){ return normalizeAccount(localStorage.getItem(config.STORAGE_KEY_ACCOUNT || 'p04_smile_account')); }
+  function myNickname(){ return normalizeNickname(localStorage.getItem(config.STORAGE_KEY_NICKNAME || 'p04_smile_nickname')); }
+  function saveProfile(a,n){ localStorage.setItem(config.STORAGE_KEY_ACCOUNT || 'p04_smile_account',a); localStorage.setItem(config.STORAGE_KEY_NICKNAME || 'p04_smile_nickname',n); }
+  function setMessage(text,type=''){ indexMessage.textContent=text; indexMessage.className='status-message'+(type?` ${type}`:''); }
+  function escapeHtml(v){ return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;"); }
+
+  function functionUrl(key){ return config.FUNCTIONS?.[key]; }
+  async function invoke(key, body={}){
+    const url=functionUrl(key);
+    if(!url || url.includes('YOUR-PROJECT')) return {data:null,error:{message:'config.js 尚未設定完整的 Edge Function URL。'}};
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':config.SUPABASE_ANON_KEY,'Authorization':`Bearer ${config.SUPABASE_ANON_KEY}`},body:JSON.stringify(body)});
+      const data=await r.json().catch(()=>null);
+      if(!r.ok) return {data,error:{message:data?.message||`HTTP ${r.status}`}};
+      return {data,error:null};
+    }catch(e){ return {data:null,error:{message:e?.message||'連線失敗'}}; }
   }
 
-  function normalizeNickname(value) {
-    return (value || '').trim();
-  }
+  function hasTarget(){ return validAccount(targetAccount); }
+  function hasProfile(){ return validAccount(myAccount()) && validNickname(myNickname()); }
 
-  function isValidAccount(account) {
-    return /^[a-zA-Z0-9._%+-]+$/.test(normalizeAccount(account));
-  }
+  function refreshFlow(){
+    const profileReady=hasProfile();
 
-  function isValidNickname(nickname) {
-    const value = normalizeNickname(nickname);
-    return value.length > 0 && value.length <= config.NICKNAME_MAX_LENGTH;
-  }
+    accountFormSection.classList.toggle('hidden', profileReady);
+    currentAccountSection.classList.toggle('hidden', !profileReady);
 
-  function accountToEmail(account) {
-    return `${normalizeAccount(account)}${config.EMAIL_DOMAIN}`;
-  }
-
-  function getStoredAccount() {
-    return normalizeAccount(localStorage.getItem(config.STORAGE_KEY_ACCOUNT));
-  }
-
-  function getStoredNickname() {
-    return normalizeNickname(localStorage.getItem(config.STORAGE_KEY_NICKNAME));
-  }
-
-  function setStoredProfile(account, nickname) {
-    localStorage.setItem(config.STORAGE_KEY_ACCOUNT, normalizeAccount(account));
-    localStorage.setItem(config.STORAGE_KEY_NICKNAME, normalizeNickname(nickname));
-  }
-
-  function clearStoredProfile() {
-    localStorage.removeItem(config.STORAGE_KEY_ACCOUNT);
-    localStorage.removeItem(config.STORAGE_KEY_NICKNAME);
-  }
-
-  function setMessage(message, type = '') {
-    indexMessage.textContent = message;
-    indexMessage.className = 'status-message';
-    if (type) indexMessage.classList.add(type);
-  }
-
-  function refreshUI() {
-    const account = getStoredAccount();
-    const nickname = getStoredNickname();
-
-    if (account && isValidAccount(account) && nickname && isValidNickname(nickname)) {
-      accountFormSection.classList.add('hidden');
-      currentAccountSection.classList.remove('hidden');
-      currentNicknameText.textContent = nickname;
-      currentAccountText.textContent = accountToEmail(account);
-      welcomeText.textContent = `${nickname} 您好，請點選以下功能。`;
-      myQrBtn.disabled = false;
-      scanBtn.disabled = false;
-    } else {
-      accountFormSection.classList.remove('hidden');
-      currentAccountSection.classList.add('hidden');
-      welcomeText.textContent = '請先輸入您的校園帳號與暱稱。';
-      myQrBtn.disabled = true;
-      scanBtn.disabled = true;
+    if(profileReady){
+      currentNicknameText.textContent=myNickname();
+      currentAccountText.textContent=accountToEmail(myAccount());
     }
-  }
 
-  function ensureConfigAvailable() {
-    return Boolean(
-      config.SUPABASE_URL &&
-      !config.SUPABASE_URL.includes('YOUR-PROJECT') &&
-      config.SUPABASE_ANON_KEY &&
-      !config.SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY')
-    );
-  }
+    if(hasTarget()){
+      targetSection.classList.remove('hidden');
+      targetNameText.textContent=targetNickname || '一位校園夥伴';
+      targetAccountText.textContent=accountToEmail(targetAccount);
+      homeActions.classList.add('hidden');
 
-  function createClient() {
-    return window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  }
-
-
-  function getFunctionUrl(key) {
-    return config.FUNCTIONS && config.FUNCTIONS[key];
-  }
-
-  async function invokeP04Function(key, body = {}, extraHeaders = {}) {
-    const url = getFunctionUrl(key);
-    if (!url || url.includes('YOUR-PROJECT')) {
-      return { data: null, error: { message: '請先在 config.js 填入正確的 Function URL。' } };
-    }
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
-          ...extraHeaders
-        },
-        body: JSON.stringify(body || {})
-      });
-      let data = null;
-      try { data = await response.json(); } catch (_) {}
-      if (!response.ok) {
-        return { data, error: { message: data?.message || `Edge Function returned ${response.status}` } };
+      if(!profileReady){
+        responseSection.classList.add('hidden');
+        welcomeText.textContent='你已經掃到對方的微笑碼。先設定自己的資料，完成後會直接回到這次回應，不需要再掃一次。';
+        pendingTargetHint.textContent='設定完成後，會直接繼續這次回應。';
+      }else if(myAccount()===targetAccount){
+        responseSection.classList.add('hidden');
+        setMessage('這是你自己的微笑碼。請把它給別人掃描；你不能記錄自己。','warn');
+      }else{
+        responseSection.classList.remove('hidden');
+        welcomeText.textContent='掃描完成。選擇剛剛感受到的善意，就能完成這次記錄。';
       }
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error: { message: error?.message || 'Function 呼叫失敗。' } };
+    }else{
+      targetSection.classList.add('hidden');
+      responseSection.classList.add('hidden');
+      homeActions.classList.remove('hidden');
+      welcomeText.textContent=profileReady
+        ? '想記錄一個善意，就掃描對方的「微笑碼」；想讓別人記錄你，就打開「我的微笑碼」。'
+        : '第一次使用只要設定一次資料。之後掃到誰的「微笑碼」，就直接回應誰。';
     }
   }
 
-  function renderPlaceholder(listElement, text) {
-    if (!listElement) return;
-    listElement.innerHTML = `<li class="leaderboard-placeholder">${text}</li>`;
-  }
+  $('saveAccountBtn')?.addEventListener('click',()=>{
+    const a=normalizeAccount(accountInput.value), n=normalizeNickname(nicknameInput.value);
+    if(!validAccount(a)){ setMessage('請輸入正確的校園帳號，只填 @ 前面的部分。','error'); return; }
+    if(!validNickname(n)){ setMessage(`請輸入 1–${config.NICKNAME_MAX_LENGTH||20} 字的暱稱。`,'error'); return; }
+    saveProfile(a,n);
+    setMessage(hasTarget()?'設定完成，可以直接完成這次回應。':'資料已儲存。','success');
+    refreshFlow();
+    loadMyRecords();
+  });
 
-  function renderRanking(listElement, rankingData) {
-    if (!listElement) return;
-    if (!rankingData.length) {
-      renderPlaceholder(listElement, '目前尚無資料');
-      return;
-    }
-    listElement.innerHTML = rankingData.map((item, index) => {
-      const safeNickname = item.nickname || item.account;
-      return `<li><span class="rank-order">${index + 1}.</span><span class="rank-name">${safeNickname}</span><span class="rank-count">${item.count} 次</span></li>`;
-    }).join('');
-  }
+  $('editAccountBtn')?.addEventListener('click',()=>{
+    accountInput.value=myAccount(); nicknameInput.value=myNickname();
+    localStorage.removeItem(config.STORAGE_KEY_ACCOUNT || 'p04_smile_account');
+    localStorage.removeItem(config.STORAGE_KEY_NICKNAME || 'p04_smile_nickname');
+    refreshFlow(); accountInput.focus();
+  });
 
-  async function loadHomepageStats() {
-    if (!ensureConfigAvailable()) {
-      totalSmileCount.textContent = '--';
-      renderPlaceholder(smilerRankingList, '請先設定 Supabase');
-      renderPlaceholder(responderRankingList, '請先設定 Supabase');
-      return;
-    }
+  $('scanBtn')?.addEventListener('click',()=> location.href='scan.html');
+  $('myQrBtn')?.addEventListener('click',()=> location.href='myqrcode.html');
 
-    const { data, error } = await invokeP04Function('GET_HOME_STATS', {});
-
-    if (error || !data?.success) {
-      console.error(error || data);
-      totalSmileCount.textContent = '--';
-      renderPlaceholder(smilerRankingList, '讀取失敗');
-      renderPlaceholder(responderRankingList, '讀取失敗');
-      return;
-    }
-
-    totalSmileCount.textContent = data.totalSmileCount ?? 0;
-    renderRanking(smilerRankingList, data.smilerRanking || []);
-    renderRanking(responderRankingList, data.responderRanking || []);
-  }
-
-
-
-  function formatDateTime(value) {
-    if (!value) return '';
-    const d = new Date(value);
-    if (Number.isNaN(d.getTime())) return String(value);
-    return d.toLocaleString('zh-TW', {
-      year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit'
+  document.querySelectorAll('.response-button').forEach(btn=>btn.addEventListener('click',async()=>{
+    if(!hasTarget() || !hasProfile()) return;
+    document.querySelectorAll('.response-button').forEach(b=>b.disabled=true);
+    setMessage('正在把這個善意記錄下來…','warn');
+    const {data,error}=await invoke('SUBMIT_SMILE_EVENT',{
+      smiler_account:targetAccount,
+      smiler_nickname:targetNickname || undefined,
+      responder_account:myAccount(),
+      responder_nickname:myNickname(),
+      smile_type:Number(btn.dataset.type)
     });
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  function renderRecordLoading() {
-    if (mySmileRecordsBody) mySmileRecordsBody.innerHTML = '<div class="record-empty">載入中…</div>';
-    if (myResponseRecordsBody) myResponseRecordsBody.innerHTML = '<div class="record-empty">載入中…</div>';
-  }
-
-  function renderRecordUnavailable(message) {
-    const html = `<div class="record-empty">${escapeHtml(message)}</div>`;
-    if (mySmileRecordsBody) mySmileRecordsBody.innerHTML = html;
-    if (myResponseRecordsBody) myResponseRecordsBody.innerHTML = html;
-  }
-
-  async function loadMyRecords(mode, page) {
-    const account = getStoredAccount();
-    if (!account || !isValidAccount(account)) {
-      return { success: false, message: '請先儲存帳號後，才能顯示個人紀錄。' };
-    }
-    return (await invokeP04Function('GET_MY_RECORDS', { account, mode, page })).data || { success: false, message: '讀取失敗。' };
-  }
-
-  function renderRecordTable(target, data, mode) {
-    if (!target) return;
-    if (!data?.success) {
-      target.innerHTML = `<div class="record-error">${escapeHtml(data?.message || '讀取失敗')}</div>`;
+    if(error || !data?.success){
+      const code=data?.code;
+      setMessage(code==='DUPLICATE_TODAY'?'今天已經記錄過這位夥伴了。':code==='SELF_NOT_ALLOWED'?'不能記錄自己。':data?.message||error?.message||'送出失敗。','error');
+      document.querySelectorAll('.response-button').forEach(b=>b.disabled=false);
       return;
     }
-    const rows = data.rows || [];
-    if (!rows.length) {
-      target.innerHTML = `
-        <div class="record-empty">目前尚無資料。今天也可以先送出第一個善意漣漪。</div>
-        <div class="record-pagination"><button disabled>上一頁</button><span>第 1 / 1 頁</span><button disabled>下一頁</button></div>
-      `;
-      return;
-    }
-    const body = rows.map(row => {
-      const otherName = mode === 'smiler'
-        ? (row.responder_nickname || row.responder_account || '某位同學')
-        : (row.smiler_nickname || row.smiler_account || '某位同學');
-      const verb = mode === 'smiler' ? '記錄了你給他的' : '你記錄了他給你的';
-      return `
-        <tr>
-          <td>${escapeHtml(formatDateTime(row.created_at))}</td>
-          <td>${escapeHtml(otherName)}</td>
-          <td><span class="record-pill">${escapeHtml(row.smile_type_label || '善意')}</span>${escapeHtml(verb)}</td>
-        </tr>
-      `;
+    setMessage('完成！謝謝你讓一個善意被看見。','success');
+    setTimeout(()=> location.href=config.SITE_URL || 'https://bagilu.github.io/P04/', 1300);
+  }));
+
+  function renderRanking(el,rows){
+    if(!el)return;
+    if(!rows?.length){el.innerHTML='<li class="leaderboard-placeholder">目前尚無資料</li>';return;}
+    el.innerHTML=rows.map((r,i)=>`<li><span class="rank-order">${i+1}</span><span class="rank-name">${escapeHtml(r.nickname||r.account)}</span><span class="rank-count">${r.count} 次</span></li>`).join('');
+  }
+
+  async function loadStats(){
+    const {data,error}=await invoke('GET_HOME_STATS',{});
+    if(error||!data?.success){ totalSmileCount.textContent='--'; renderRanking(smilerRankingList,[]); renderRanking(responderRankingList,[]); return; }
+    totalSmileCount.textContent=data.totalSmileCount??0;
+    renderRanking(smilerRankingList,data.smilerRanking||[]);
+    renderRanking(responderRankingList,data.responderRanking||[]);
+  }
+
+  function fmt(v){ const d=new Date(v); return Number.isNaN(d.getTime())?String(v||''):d.toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+  async function queryRecords(mode,page){
+    if(!hasProfile()) return {success:false,message:'設定自己的資料後，就能看到個人紀錄。'};
+    const {data,error}=await invoke('GET_MY_RECORDS',{account:myAccount(),mode,page});
+    return error?{success:false,message:error.message}:data;
+  }
+  function renderRecords(el,data,mode){
+    if(!el)return;
+    if(!data?.success){el.innerHTML=`<div class="record-empty">${escapeHtml(data?.message||'讀取失敗')}</div>`;return;}
+    const rows=data.rows||[];
+    const body=rows.map(r=>{
+      const other=mode==='smiler'?(r.responder_nickname||r.responder_account):(r.smiler_nickname||r.smiler_account);
+      const text=mode==='smiler'?`對方記錄了你帶給他的${r.smile_type_label||'善意'}`:`你記錄了對方帶給你的${r.smile_type_label||'善意'}`;
+      return `<tr><td>${escapeHtml(fmt(r.created_at))}</td><td>${escapeHtml(other||'某位夥伴')}</td><td><span class="record-pill">${escapeHtml(r.smile_type_label||'善意')}</span>${escapeHtml(text)}</td></tr>`;
     }).join('');
-    const prevDisabled = data.page <= 1 ? 'disabled' : '';
-    const nextDisabled = data.page >= data.total_pages ? 'disabled' : '';
-    target.innerHTML = `
-      <table class="record-table">
-        <thead><tr><th>時間</th><th>對象</th><th>內容</th></tr></thead>
-        <tbody>${body}</tbody>
-      </table>
-      <div class="record-pagination">
-        <button data-record-mode="${mode}" data-record-action="prev" ${prevDisabled}>上一頁</button>
-        <span>第 ${data.page} / ${data.total_pages} 頁，共 ${data.total} 筆</span>
-        <button data-record-mode="${mode}" data-record-action="next" ${nextDisabled}>下一頁</button>
-      </div>
-    `;
+    el.innerHTML=`${rows.length?`<table class="record-table"><thead><tr><th>時間</th><th>對象</th><th>內容</th></tr></thead><tbody>${body}</tbody></table>`:'<div class="record-empty">目前尚無資料。</div>'}
+      <div class="record-pagination"><button data-record-mode="${mode}" data-dir="-1" ${data.page<=1?'disabled':''}>上一頁</button><span>第 ${data.page||1} / ${data.total_pages||1} 頁，共 ${data.total||0} 筆</span><button data-record-mode="${mode}" data-dir="1" ${data.page>=data.total_pages?'disabled':''}>下一頁</button></div>`;
   }
-
-  async function loadAllMyRecords() {
-    if (!mySmileRecordsBody && !myResponseRecordsBody) return;
-    if (!ensureConfigAvailable()) {
-      renderRecordUnavailable('請先完成 config.js 的 Supabase 與 Function URL 設定。');
-      return;
-    }
-    const account = getStoredAccount();
-    if (!account || !isValidAccount(account)) {
-      renderRecordUnavailable('請先儲存帳號後，才能顯示個人紀錄。');
-      return;
-    }
-    renderRecordLoading();
-    const [smileData, responseData] = await Promise.all([
-      loadMyRecords('smiler', mySmilePage),
-      loadMyRecords('responder', myResponsePage),
-    ]);
-    renderRecordTable(mySmileRecordsBody, smileData, 'smiler');
-    renderRecordTable(myResponseRecordsBody, responseData, 'responder');
+  async function loadMyRecords(){
+    renderRecords(mySmileRecordsBody,await queryRecords('smiler',mySmilePage),'smiler');
+    renderRecords(myResponseRecordsBody,await queryRecords('responder',myResponsePage),'responder');
   }
-
-  document.addEventListener('click', async (event) => {
-    const btn = event.target.closest('button[data-record-mode][data-record-action]');
-    if (!btn) return;
-    const mode = btn.dataset.recordMode;
-    const action = btn.dataset.recordAction;
-    if (mode === 'smiler') {
-      mySmilePage = action === 'prev' ? Math.max(1, mySmilePage - 1) : mySmilePage + 1;
-      const data = await loadMyRecords('smiler', mySmilePage);
-      renderRecordTable(mySmileRecordsBody, data, 'smiler');
-    }
-    if (mode === 'responder') {
-      myResponsePage = action === 'prev' ? Math.max(1, myResponsePage - 1) : myResponsePage + 1;
-      const data = await loadMyRecords('responder', myResponsePage);
-      renderRecordTable(myResponseRecordsBody, data, 'responder');
-    }
+  document.addEventListener('click',async e=>{
+    const b=e.target.closest('button[data-record-mode]'); if(!b)return;
+    const mode=b.dataset.recordMode,dir=Number(b.dataset.dir);
+    if(mode==='smiler'){mySmilePage=Math.max(1,mySmilePage+dir);renderRecords(mySmileRecordsBody,await queryRecords(mode,mySmilePage),mode);}
+    else{myResponsePage=Math.max(1,myResponsePage+dir);renderRecords(myResponseRecordsBody,await queryRecords(mode,myResponsePage),mode);}
   });
 
-  saveAccountBtn?.addEventListener('click', () => {
-    const account = normalizeAccount(accountInput.value);
-    const nickname = normalizeNickname(nicknameInput.value);
-
-    if (!account) {
-      setMessage('請輸入帳號。', 'error');
-      return;
-    }
-    if (!isValidAccount(account)) {
-      setMessage('帳號格式不正確，請只輸入 @ 前面的帳號內容。', 'error');
-      return;
-    }
-    if (!isValidNickname(nickname)) {
-      setMessage(`請輸入 1 到 ${config.NICKNAME_MAX_LENGTH} 字的暱稱。`, 'error');
-      return;
-    }
-
-    setStoredProfile(account, nickname);
-    accountInput.value = account;
-    nicknameInput.value = nickname;
-    setMessage('資料已儲存。', 'success');
-    refreshUI();
-    loadAllMyRecords();
-  });
-
-  editAccountBtn?.addEventListener('click', () => {
-    const account = getStoredAccount();
-    const nickname = getStoredNickname();
-    accountInput.value = account;
-    nicknameInput.value = nickname;
-    clearStoredProfile();
-    refreshUI();
-    setMessage('請輸入新的帳號與暱稱後重新儲存。', 'warn');
-    accountInput.focus();
-    loadAllMyRecords();
-  });
-
-  myQrBtn?.addEventListener('click', () => {
-    window.location.href = 'myqrcode.html';
-  });
-
-  scanBtn?.addEventListener('click', () => {
-    window.location.href = 'scan.html';
-  });
-
-  if (systemEntryQr) {
-    new QRCode(systemEntryQr, {
-      text: config.SITE_URL,
-      width: 132,
-      height: 132,
-      correctLevel: QRCode.CorrectLevel.M
-    });
-  }
-
-  refreshUI();
-  loadHomepageStats();
-  loadAllMyRecords();
+  refreshFlow();
+  loadStats();
+  loadMyRecords();
 })();

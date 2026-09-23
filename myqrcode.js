@@ -1,149 +1,49 @@
-(function () {
-  const config = window.APP_CONFIG;
-  const myNicknameDisplay = document.getElementById('myNicknameDisplay');
-  const myAccountDisplay = document.getElementById('myAccountDisplay');
-  const myQrCodeBox = document.getElementById('myQrCodeBox');
-  const myQrMessage = document.getElementById('myQrMessage');
-  const editAccountBtn = document.getElementById('editAccountBtn');
-  const liveNoticePanel = document.getElementById('liveNoticePanel');
-  const liveNoticeText = document.getElementById('liveNoticeText');
+(function(){
+  const cfg=window.APP_CONFIG||{};
+  const account=String(localStorage.getItem(cfg.STORAGE_KEY_ACCOUNT||'p04_smile_account')||'').trim().toLowerCase();
+  const nickname=String(localStorage.getItem(cfg.STORAGE_KEY_NICKNAME||'p04_smile_nickname')||'').trim();
+  const box=document.getElementById('myQrCodeBox'), msg=document.getElementById('myQrMessage');
+  const panel=document.getElementById('liveNoticePanel'), notice=document.getElementById('liveNoticeText');
+  let lastCheckedAt=new Date().toISOString();
 
-  let lastCheckedAt = new Date().toISOString();
-  let pollTimer = null;
-
-  function normalizeAccount(value) {
-    return (value || '').trim().toLowerCase();
+  function valid(v){return /^[a-zA-Z0-9._%+-]+$/.test(v)}
+  function setMsg(t,c=''){msg.textContent=t;msg.className='status-message'+(c?` ${c}`:'')}
+  async function invoke(body){
+    const url=cfg.FUNCTIONS?.GET_RECENT_NOTICE;
+    if(!url)return null;
+    try{
+      const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json','apikey':cfg.SUPABASE_ANON_KEY,'Authorization':`Bearer ${cfg.SUPABASE_ANON_KEY}`},body:JSON.stringify(body)});
+      return await r.json();
+    }catch{return null}
   }
 
-  function normalizeNickname(value) {
-    return (value || '').trim();
+  if(!valid(account)||!nickname){
+    setMsg('請先回首頁設定自己的校園帳號與暱稱。','error');
+    return;
   }
 
-  function isValidAccount(account) {
-    return /^[a-zA-Z0-9._%+-]+$/.test(normalizeAccount(account));
-  }
+  document.getElementById('myNicknameDisplay').textContent=nickname;
+  document.getElementById('myAccountDisplay').textContent=`${account}${cfg.EMAIL_DOMAIN||'@gms.tcu.edu.tw'}`;
 
-  function isValidNickname(nickname) {
-    const value = normalizeNickname(nickname);
-    return value.length > 0 && value.length <= config.NICKNAME_MAX_LENGTH;
-  }
+  const base=(cfg.SITE_URL||'https://bagilu.github.io/P04/').replace(/\/?$/,'/');
+  const smileUrl=`${base}?to=${encodeURIComponent(account)}&name=${encodeURIComponent(nickname)}`;
+  document.getElementById('smileCodeUrl').textContent=smileUrl;
 
-  function accountToEmail(account) {
-    return `${normalizeAccount(account)}${config.EMAIL_DOMAIN}`;
-  }
+  new QRCode(box,{text:smileUrl,width:210,height:210,correctLevel:QRCode.CorrectLevel.M});
+  setMsg('這就是你唯一的「微笑碼」。對方掃描後會直接進入回應流程。','success');
 
-  function ensureConfigAvailable() {
-    return Boolean(
-      config.SUPABASE_URL &&
-      !config.SUPABASE_URL.includes('YOUR-PROJECT') &&
-      config.SUPABASE_ANON_KEY &&
-      !config.SUPABASE_ANON_KEY.includes('YOUR_SUPABASE_ANON_KEY')
-    );
-  }
-
-  function createClient() {
-    return window.supabase.createClient(config.SUPABASE_URL, config.SUPABASE_ANON_KEY);
-  }
-
-
-  function getFunctionUrl(key) {
-    return config.FUNCTIONS && config.FUNCTIONS[key];
-  }
-
-  async function invokeP04Function(key, body = {}, extraHeaders = {}) {
-    const url = getFunctionUrl(key);
-    if (!url || url.includes('YOUR-PROJECT')) {
-      return { data: null, error: { message: '請先在 config.js 填入正確的 Function URL。' } };
-    }
-    try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${config.SUPABASE_ANON_KEY}`,
-          ...extraHeaders
-        },
-        body: JSON.stringify(body || {})
-      });
-      let data = null;
-      try { data = await response.json(); } catch (_) {}
-      if (!response.ok) {
-        return { data, error: { message: data?.message || `Edge Function returned ${response.status}` } };
-      }
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error: { message: error?.message || 'Function 呼叫失敗。' } };
+  async function poll(){
+    const data=await invoke({smiler_account:account,after_created_at:lastCheckedAt,limit:3});
+    const now=new Date().toISOString();
+    if(!data?.success)return;
+    if(data.rows?.length){
+      const row=data.rows[0];
+      const who=row.responder_nickname||row.responder_account||'某位校園夥伴';
+      notice.textContent=`${who} 剛剛記錄了你帶給他的「${row.smile_type_label||'善意'}」。`;
+      panel.classList.remove('hidden');
+      lastCheckedAt=row.created_at||now;
+      setTimeout(()=>panel.classList.add('hidden'),cfg.NOTIFICATION_DISPLAY_MS||8000);
     }
   }
-
-  function setMessage(message, type = '') {
-    myQrMessage.textContent = message;
-    myQrMessage.className = 'status-message';
-    if (type) myQrMessage.classList.add(type);
-  }
-
-  function showLiveNotice(row) {
-    if (!row) return;
-    const name = row.responder_nickname || row.responder_account || '某位同學';
-    const label = row.smile_type_label || '善意';
-    liveNoticeText.textContent = `${name} 剛剛送出紀錄。謝謝你的${label}。`;
-    liveNoticePanel.classList.remove('hidden');
-    liveNoticePanel.classList.remove('notice-pop');
-    void liveNoticePanel.offsetWidth;
-    liveNoticePanel.classList.add('notice-pop');
-  }
-
-  async function pollRecentNotifications(account) {
-    if (!ensureConfigAvailable()) return;
-
-    const { data, error } = await invokeP04Function('GET_RECENT_NOTICE', {
-      smiler_account: account,
-      since: lastCheckedAt
-    });
-
-    const now = new Date().toISOString();
-
-    if (error || !data?.success) {
-      console.warn(error || data);
-      return;
-    }
-
-    const rows = data.rows || [];
-    if (rows.length) {
-      showLiveNotice(rows[0]);
-      lastCheckedAt = rows[0].created_at || now;
-    }
-  }
-
-  const account = normalizeAccount(localStorage.getItem(config.STORAGE_KEY_ACCOUNT));
-  const nickname = normalizeNickname(localStorage.getItem(config.STORAGE_KEY_NICKNAME));
-
-  if (!isValidAccount(account) || !isValidNickname(nickname)) {
-    setMessage('尚未設定有效帳號與暱稱，請先回到主畫面輸入資料。', 'error');
-  } else {
-    myNicknameDisplay.textContent = nickname;
-    myAccountDisplay.textContent = accountToEmail(account);
-
-    new QRCode(myQrCodeBox, {
-      text: accountToEmail(account),
-      width: 190,
-      height: 190,
-      correctLevel: QRCode.CorrectLevel.M
-    });
-
-    setMessage('此 QRCode 內容為完整校園 Email；掃描後系統會自動轉換為帳號。', 'success');
-
-    if (ensureConfigAvailable()) {
-      pollTimer = setInterval(() => pollRecentNotifications(account), config.NOTIFICATION_POLL_MS || 5000);
-      document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) pollRecentNotifications(account);
-      });
-    }
-  }
-
-  editAccountBtn?.addEventListener('click', () => {
-    if (pollTimer) clearInterval(pollTimer);
-    window.location.href = 'index.html';
-  });
+  setInterval(poll,cfg.NOTIFICATION_POLL_MS||3000);
 })();

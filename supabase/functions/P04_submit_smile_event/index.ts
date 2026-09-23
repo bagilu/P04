@@ -90,6 +90,7 @@ serve(async (req) => {
     const smilerAccount = normalizeAccount(body?.smiler_account);
     const responderAccount = normalizeAccount(body?.responder_account);
     const responderNickname = normalizeNickname(body?.responder_nickname);
+    const suppliedSmilerNickname = normalizeNickname(body?.smiler_nickname);
     const smileType = Number(body?.smile_type);
 
     if (!isValidAccount(smilerAccount) || !isValidAccount(responderAccount)) {
@@ -107,7 +108,9 @@ serve(async (req) => {
 
     const supabase = getServiceClient();
     const eventDate = todayTaipeiDate();
-    const smilerNickname = await resolveSmilerNickname(supabase, smilerAccount);
+    const smilerNickname = isValidNickname(suppliedSmilerNickname, 20)
+      ? suppliedSmilerNickname
+      : await resolveSmilerNickname(supabase, smilerAccount);
 
     const { data, error } = await supabase
       .from(TABLE_SMILE_EVENTS)

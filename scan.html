@@ -3,40 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>掃描他人 QRCode｜慈濟大學微笑漣漪系統</title>
+  <meta name="theme-color" content="#fffdf7">
+  <title>掃描微笑碼｜P04 微笑漣漪</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
 </head>
 <body>
   <div class="page-shell narrow-shell">
-    <main class="content-card">
-      <h1 class="page-title">掃描他人 QRCode</h1>
-      <p id="scannerNotice" class="status-message warn">正在準備相機與帳號資料…</p>
-
-      <div id="reader" class="scanner-box"></div>
-
-      <section id="scanResultBlock" class="scan-result-block hidden">
-        <div class="mini-label">已掃描到帳號</div>
-        <div id="targetAccountText" class="target-account-text"></div>
-
-        <div class="feedback-grid">
-          <button class="btn btn-feedback feedback-btn" data-type="1">他對我微笑</button>
-          <button class="btn btn-feedback feedback-btn" data-type="2">他和我打招呼</button>
-          <button class="btn btn-feedback feedback-btn" data-type="3">他鼓勵我</button>
-          <button class="btn btn-feedback feedback-btn" data-type="4">他幫助我</button>
-        </div>
-      </section>
-
-      <p id="scanStatusMessage" class="status-message"></p>
-
-      <div class="action-row">
-        <button id="restartScanBtn" class="btn btn-secondary hidden">重新掃描</button>
-        <a href="index.html" class="btn btn-secondary">回主畫面</a>
-      </div>
+    <main class="scanner-card">
+      <div class="section-kicker">SCAN A SMILE</div>
+      <h1 class="page-title">掃描對方的微笑碼</h1>
+      <p class="scanner-help">掃描後會直接回到 P04，並自動帶入對方。不需要再掃第二次。</p>
+      <div id="reader"></div>
+      <p id="scanStatusMessage" class="status-message">準備開啟相機…</p>
+      <p class="legacy-note">舊版以校園 Email 編碼的 QR Code 仍可辨識，方便過渡。</p>
+      <a class="back-link" href="./">← 回 P04 首頁</a>
     </main>
   </div>
-
   <script src="config.js"></script>
   <script src="scan.js"></script>
 </body>
