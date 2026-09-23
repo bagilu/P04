@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>P04 微笑漣漪</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="canonical" href="https://bagilu.github.io/P04/">
+  <meta property="og:url" content="https://bagilu.github.io/P04/">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero-card">
+      <div class="hero-main">
+        <div class="logo-badge">😊</div>
+        <div class="hero-texts">
+          <h1 class="hero-title-zh">P04 微笑漣漪</h1>
+          <p class="brand-credit">慈濟大學　<strong>經營管理學系　<a class="lab-link" href="https://tcubmdsbilab.github.io/P101/" target="_blank" rel="noopener noreferrer">好玩實驗室</a>　作品</strong></p>
+          <p class="hero-title-en">TCU Smile Ripple</p>
+          <p class="description">在校園裡，用一個點頭微笑、一句招呼，讓善意被看見，讓溫暖被記錄。</p>
+          <p class="slogan">一個微笑，可能就是別人今天重新相信自己的開始。</p>
+        </div>
+      </div>
+      <div class="entry-qr-card">
+        <div class="entry-qr-title">首次使用請掃描</div>
+        <div id="systemEntryQr" class="small-qr"></div>
+        <div class="entry-qr-url">https://bagilu.github.io/P04V1/</div>
+      </div>
+    </header>
+
+    <main class="content-card">
+      <section class="welcome-block">
+        <h2>開始使用</h2>
+        <p id="welcomeText">請先輸入您的校園帳號與暱稱。</p>
+      </section>
+
+      <section class="stats-strip">
+        <div class="stats-card">
+          <div class="stats-label">系統累計微笑次數</div>
+          <div class="stats-value"><span id="totalSmileCount">--</span><span class="stats-unit">次</span></div>
+        </div>
+      </section>
+
+      <section id="accountFormSection" class="account-form-section hidden">
+        <label for="accountInput" class="field-label">校園帳號</label>
+        <div class="account-input-wrap">
+          <input id="accountInput" type="text" placeholder="例如 abc123" autocomplete="off" maxlength="40">
+          <span class="fixed-domain">@gms.tcu.edu.tw</span>
+        </div>
+
+        <label for="nicknameInput" class="field-label mt-18">暱稱</label>
+        <div class="account-input-wrap">
+          <input id="nicknameInput" type="text" placeholder="例如 王小明、李老師" autocomplete="off" maxlength="20">
+        </div>
+        <p class="input-hint">暱稱僅保存在目前裝置的瀏覽器中，長度上限 20 字。</p>
+
+        <div class="action-row compact-row">
+          <button id="saveAccountBtn" class="btn btn-primary">儲存資料</button>
+        </div>
+      </section>
+
+      <section id="currentAccountSection" class="current-account-section hidden">
+        <div class="current-account-card">
+          <div>
+            <div class="mini-label">目前資料</div>
+            <div id="currentNicknameText" class="current-nickname-text"></div>
+            <div id="currentAccountText" class="current-account-text"></div>
+          </div>
+          <button id="editAccountBtn" class="btn btn-secondary">修改資料</button>
+        </div>
+      </section>
+
+      <section class="main-actions">
+        <button id="myQrBtn" class="btn btn-big btn-primary">顯示我的 QRCode</button>
+        <button id="scanBtn" class="btn btn-big btn-accent">掃描他人 QRCode</button>
+      </section>
+
+
+      <p id="indexMessage" class="status-message"></p>
+
+      <section class="leaderboard-section game-dashboard-section">
+        <div class="leaderboard-card leaderboard-card-primary-light">
+          <h3>前 10 名微笑王</h3>
+          <ol id="smilerRankingList" class="leaderboard-list">
+            <li class="leaderboard-placeholder">讀取中…</li>
+          </ol>
+        </div>
+        <div class="leaderboard-card leaderboard-card-accent-light">
+          <h3>前 10 名回應王</h3>
+          <ol id="responderRankingList" class="leaderboard-list">
+            <li class="leaderboard-placeholder">讀取中…</li>
+          </ol>
+        </div>
+      </section>
+
+      <section id="myRecordsSection" class="my-records-section">
+        <div class="my-records-header">
+          <div class="section-kicker">My Smile Log</div>
+          <h2>我的微笑與回應紀錄</h2>
+          <p>每頁顯示 10 筆，方便回顧自己在校園裡創造與收到的善意漣漪。</p>
+        </div>
+
+        <div class="my-records-grid">
+          <article class="record-panel record-panel-smile">
+            <div class="record-panel-title-row">
+              <div class="record-icon">🌞</div>
+              <div>
+                <h3>我的微笑紀錄</h3>
+                <p>別人記錄了我對他的微笑、問候或鼓勵</p>
+              </div>
+            </div>
+            <div id="mySmileRecordsBody" class="record-table-body">載入中…</div>
+          </article>
+
+          <article class="record-panel record-panel-response">
+            <div class="record-panel-title-row">
+              <div class="record-icon">🌱</div>
+              <div>
+                <h3>我的回應紀錄</h3>
+                <p>我記錄了別人給我的微笑、問候或鼓勵</p>
+              </div>
+            </div>
+            <div id="myResponseRecordsBody" class="record-table-body">載入中…</div>
+          </article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+<script src="my_records_component.js"></script>
+</body>
+</html>
